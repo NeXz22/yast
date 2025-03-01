@@ -170,6 +170,36 @@ io.on('connection', (socket) => {
     });
   });
   
+  // Reorder participants
+  socket.on('reorderParticipants', ({ srcId, targetId }) => {
+    const sessionId = socket.sessionId;
+    if (!sessionId || !sessions.has(sessionId)) return;
+    
+    const session = sessions.get(sessionId);
+    
+    // Find the indices of the source and target participants
+    const srcIndex = session.participants.findIndex(p => p.id === srcId);
+    const targetIndex = session.participants.findIndex(p => p.id === targetId);
+    
+    if (srcIndex === -1 || targetIndex === -1) return;
+    
+    // Remove the source participant
+    const [participant] = session.participants.splice(srcIndex, 1);
+    
+    // Insert at the target position
+    session.participants.splice(targetIndex, 0, participant);
+    
+    // Ensure the first participant is always the driver
+    session.participants.forEach((p, index) => {
+        p.isDriver = index === 0;
+    });
+    
+    // Notify all participants about the reordering
+    io.to(sessionId).emit('participantsReordered', {
+        participants: session.participants
+    });
+  });
+  
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);

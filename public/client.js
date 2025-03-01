@@ -152,6 +152,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTimerDisplay(data.timeRemaining);
     });
     
+    socket.on('participantsReordered', (data) => {
+        sessionData.participants = data.participants;
+        updateParticipantsList(data.participants);
+    });
+    
     // Helper functions
     function updateTimerDisplay(seconds) {
         const minutes = Math.floor(seconds / 60);
@@ -169,16 +174,39 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateParticipantsList(participants) {
         participantsList.innerHTML = '';
         
-        participants.forEach(participant => {
+        participants.forEach((participant, index) => {
             const li = document.createElement('li');
-            li.textContent = participant.username;
+            li.className = 'participant-item';
+            li.setAttribute('data-id', participant.id);
+            li.setAttribute('draggable', 'true');
             
+            // Create a container for the username
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'participant-name';
+            nameSpan.textContent = participant.username;
+            li.appendChild(nameSpan);
+            
+            // Add driver badge if applicable
             if (participant.isDriver) {
                 const driverBadge = document.createElement('span');
                 driverBadge.className = 'driver-indicator';
                 driverBadge.textContent = 'DRIVER';
                 li.appendChild(driverBadge);
             }
+            
+            // Add drag handle
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'drag-handle';
+            dragHandle.innerHTML = '⋮⋮';
+            li.appendChild(dragHandle);
+            
+            // Add event listeners for drag and drop
+            li.addEventListener('dragstart', handleDragStart);
+            li.addEventListener('dragover', handleDragOver);
+            li.addEventListener('dragenter', handleDragEnter);
+            li.addEventListener('dragleave', handleDragLeave);
+            li.addEventListener('drop', handleDrop);
+            li.addEventListener('dragend', handleDragEnd);
             
             participantsList.appendChild(li);
         });
@@ -211,5 +239,67 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             oscillator.stop();
         }, 500);
+    }
+    
+    // Drag and drop variables
+    let dragSrcEl = null;
+
+    function handleDragStart(e) {
+        this.style.opacity = '0.4';
+        
+        dragSrcEl = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+        
+        // Add a class to all items to show they're potential drop targets
+        document.querySelectorAll('.participant-item').forEach(item => {
+            if (item !== this) item.classList.add('potential-drop-target');
+        });
+    }
+
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+
+    function handleDragEnter(e) {
+        this.classList.add('over');
+    }
+
+    function handleDragLeave(e) {
+        this.classList.remove('over');
+    }
+
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        
+        // Don't do anything if dropping on the same item
+        if (dragSrcEl !== this) {
+            // Get the IDs of the source and target participants
+            const srcId = dragSrcEl.getAttribute('data-id');
+            const targetId = this.getAttribute('data-id');
+            
+            // Emit event to server to reorder participants
+            socket.emit('reorderParticipants', {
+                srcId: srcId,
+                targetId: targetId
+            });
+        }
+        
+        return false;
+    }
+
+    function handleDragEnd(e) {
+        this.style.opacity = '1';
+        
+        // Remove all drag-related classes
+        document.querySelectorAll('.participant-item').forEach(item => {
+            item.classList.remove('over', 'potential-drop-target');
+        });
     }
 }); 
