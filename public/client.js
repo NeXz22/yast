@@ -212,9 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
     copySessionBtn.addEventListener('click', () => {
         const sessionUrl = `${window.location.origin}/sessionid/${sessionData.sessionId}`;
         navigator.clipboard.writeText(sessionUrl)
-            .then(() => {
-                alert('Session link copied to clipboard!');
-            })
             .catch(err => {
                 console.error('Failed to copy session link:', err);
             });
