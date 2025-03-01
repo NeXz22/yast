@@ -1,5 +1,5 @@
 {
-  "name": "mob-timer",
+  "name": "yast",
   "version": "1.0.0",
   "description": "A timer for mob/ensemble programming sessions with WebSocket support",
   "main": "server.js",
