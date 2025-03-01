@@ -43,7 +43,158 @@ document.addEventListener('DOMContentLoaded', () => {
         isRunning: false
     };
     
-    // Join session
+    // Parse URL for session ID
+    function getSessionIdFromUrl() {
+        // Check for direct path format: /sessionid/ID
+        const pathMatch = window.location.pathname.match(/^\/sessionid\/([a-zA-Z0-9-]+)$/);
+        if (pathMatch) {
+            return pathMatch[1];
+        }
+        
+        // Check for query parameter format: ?id=ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const idParam = urlParams.get('id');
+        if (idParam) {
+            return idParam;
+        }
+        
+        return null;
+    }
+
+    // Get stored username from localStorage
+    function getStoredUsername(sessionId) {
+        try {
+            const storedData = localStorage.getItem('mobTimer');
+            if (storedData) {
+                const data = JSON.parse(storedData);
+                // Return username for this specific session if available
+                if (sessionId && data.sessions && data.sessions[sessionId]) {
+                    return data.sessions[sessionId].username;
+                }
+                // Otherwise return the last used username
+                return data.lastUsername || '';
+            }
+        } catch (error) {
+            console.error('Error reading from localStorage:', error);
+        }
+        return '';
+    }
+
+    // Store username in localStorage
+    function storeUsername(sessionId, username) {
+        try {
+            let data = { lastUsername: username, sessions: {} };
+            
+            // Try to get existing data
+            const storedData = localStorage.getItem('mobTimer');
+            if (storedData) {
+                data = JSON.parse(storedData);
+            }
+            
+            // Update data
+            data.lastUsername = username;
+            
+            // Store session-specific data if we have a session ID
+            if (sessionId) {
+                if (!data.sessions) data.sessions = {};
+                data.sessions[sessionId] = { 
+                    username: username,
+                    lastJoined: new Date().toISOString()
+                };
+            }
+            
+            localStorage.setItem('mobTimer', JSON.stringify(data));
+        } catch (error) {
+            console.error('Error writing to localStorage:', error);
+        }
+    }
+
+    // Check for session ID in URL
+    const urlSessionId = getSessionIdFromUrl();
+    if (urlSessionId) {
+        // If we have a session ID in the URL, pre-fill the session ID field
+        sessionIdInput.value = urlSessionId;
+        
+        // Get stored username for this session
+        const storedUsername = getStoredUsername(urlSessionId);
+        if (storedUsername) {
+            usernameInput.value = storedUsername;
+        }
+        
+        // Show a modal to get username if not already set
+        if (!storedUsername) {
+            // Create and show username modal
+            showUsernameModal(urlSessionId);
+        } else {
+            // Auto-join if we have both session ID and username
+            joinSession(urlSessionId, storedUsername);
+        }
+    } else {
+        // No session ID in URL, just pre-fill username field with last used username
+        usernameInput.value = getStoredUsername();
+    }
+
+    // Function to show username modal
+    function showUsernameModal(sessionId) {
+        // Create modal elements
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'modal-overlay';
+        
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        
+        const modalTitle = document.createElement('h2');
+        modalTitle.textContent = 'Enter Your Name';
+        
+        const modalForm = document.createElement('form');
+        modalForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = modalUsernameInput.value.trim();
+            if (username) {
+                // Store username and join session
+                storeUsername(sessionId, username);
+                joinSession(sessionId, username);
+                document.body.removeChild(modalOverlay);
+            }
+        });
+        
+        const modalUsernameInput = document.createElement('input');
+        modalUsernameInput.type = 'text';
+        modalUsernameInput.placeholder = 'Your name';
+        modalUsernameInput.required = true;
+        modalUsernameInput.value = getStoredUsername();
+        
+        const modalSubmitBtn = document.createElement('button');
+        modalSubmitBtn.type = 'submit';
+        modalSubmitBtn.className = 'btn primary';
+        modalSubmitBtn.textContent = 'Join Session';
+        
+        // Assemble modal
+        modalForm.appendChild(modalUsernameInput);
+        modalForm.appendChild(modalSubmitBtn);
+        modalContent.appendChild(modalTitle);
+        modalContent.appendChild(modalForm);
+        modalOverlay.appendChild(modalContent);
+        
+        // Add to document
+        document.body.appendChild(modalOverlay);
+        
+        // Focus the input
+        modalUsernameInput.focus();
+    }
+
+    // Function to join a session
+    function joinSession(sessionId, username) {
+        if (!username) return;
+        
+        // Store username for future use
+        storeUsername(sessionId, username);
+        
+        // Emit join event
+        socket.emit('joinSession', { sessionId, username });
+    }
+
+    // Update the join button click handler
     joinBtn.addEventListener('click', () => {
         const username = usernameInput.value.trim();
         const sessionId = sessionIdInput.value.trim();
@@ -53,17 +204,18 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        socket.emit('joinSession', { sessionId, username });
+        joinSession(sessionId, username);
     });
     
-    // Copy session ID to clipboard
+    // Update the copy session ID button click handler
     copySessionBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(sessionData.sessionId)
+        const sessionUrl = `${window.location.origin}/sessionid/${sessionData.sessionId}`;
+        navigator.clipboard.writeText(sessionUrl)
             .then(() => {
-                alert('Session ID copied to clipboard!');
+                alert('Session link copied to clipboard!');
             })
             .catch(err => {
-                console.error('Failed to copy session ID:', err);
+                console.error('Failed to copy session link:', err);
             });
     });
     
@@ -114,6 +266,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTimerDisplay(data.timeRemaining);
         updateParticipantsList(data.participants);
         updateRolesList(data.roles);
+        
+        // Update URL with the session ID from the server
+        const newUrl = `/sessionid/${data.sessionId}`;
+        if (window.location.pathname !== newUrl) {
+            window.history.pushState({ sessionId: data.sessionId }, '', newUrl);
+        }
         
         // Show session info and hide join form
         joinForm.classList.add('hidden');
@@ -359,4 +517,23 @@ document.addEventListener('DOMContentLoaded', () => {
             rolesList.appendChild(roleTag);
         });
     }
+
+    // Handle browser back/forward navigation
+    window.addEventListener('popstate', (event) => {
+        if (event.state && event.state.sessionId) {
+            // We navigated back to a session page
+            const sessionId = event.state.sessionId;
+            const username = getStoredUsername(sessionId);
+            
+            if (username) {
+                joinSession(sessionId, username);
+            } else {
+                showUsernameModal(sessionId);
+            }
+        } else {
+            // We navigated back to the home page
+            sessionInfo.classList.add('hidden');
+            joinForm.classList.remove('hidden');
+        }
+    });
 }); 

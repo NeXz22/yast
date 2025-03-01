@@ -8,8 +8,13 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Serve static files
+// Serve static files first
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Then add the catch-all route for client-side routing
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Store active sessions
 const sessions = new Map();
@@ -36,16 +41,16 @@ io.on('connection', (socket) => {
         role: null // New participants don't have a role initially
       });
     } else {
-      // Create new session
-      const newSessionId = uuidv4();
+      // Create new session with the provided ID or generate a new one
+      const newSessionId = sessionId || uuidv4();
       session = {
         id: newSessionId,
         participants: [{
           id: socket.id,
           username,
-          role: session?.roles?.[0] || DEFAULT_ROLES[0] // Assign first role to first participant
+          role: DEFAULT_ROLES[0] // Assign first role to first participant
         }],
-        roles: session?.roles || [...DEFAULT_ROLES], // Copy default roles or use existing ones
+        roles: [...DEFAULT_ROLES], // Copy default roles
         timerDuration: 10 * 60, // 10 minutes in seconds
         timeRemaining: 10 * 60,
         isRunning: false
