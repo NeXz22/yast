@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const timerDurationInput = document.getElementById('timer-duration');
     const updateDurationBtn = document.getElementById('update-duration-btn');
     const participantsList = document.getElementById('participants-list');
+    const rolesList = document.getElementById('roles-list');
+    const newRoleInput = document.getElementById('new-role-input');
+    const addRoleBtn = document.getElementById('add-role-btn');
     
     // Connect to Socket.io server with error handling
     let socket;
@@ -34,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sessionData = {
         sessionId: null,
         participants: [],
+        roles: ['Driver', 'Navigator'], // Default roles
         timerDuration: 10 * 60, // 10 minutes in seconds
         timeRemaining: 10 * 60,
         isRunning: false
@@ -87,6 +91,21 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.emit('updateTimerDuration', duration * 60); // Convert to seconds
     });
     
+    // Add event listener for adding a new role
+    addRoleBtn.addEventListener('click', () => {
+        const roleName = newRoleInput.value.trim();
+        if (!roleName) return;
+        
+        // Add the role locally
+        const updatedRoles = [...sessionData.roles, roleName];
+        
+        // Send to server
+        socket.emit('updateRoles', updatedRoles);
+        
+        // Clear input
+        newRoleInput.value = '';
+    });
+    
     // Socket event handlers
     socket.on('sessionJoined', (data) => {
         sessionData = data;
@@ -94,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         timerDurationInput.value = Math.floor(data.timerDuration / 60);
         updateTimerDisplay(data.timeRemaining);
         updateParticipantsList(data.participants);
+        updateRolesList(data.roles);
         
         // Show session info and hide join form
         joinForm.classList.add('hidden');
@@ -157,6 +177,14 @@ document.addEventListener('DOMContentLoaded', () => {
         updateParticipantsList(data.participants);
     });
     
+    // Add handler for roles updated
+    socket.on('rolesUpdated', (data) => {
+        sessionData.roles = data.roles;
+        sessionData.participants = data.participants;
+        updateRolesList(data.roles);
+        updateParticipantsList(data.participants);
+    });
+    
     // Helper functions
     function updateTimerDisplay(seconds) {
         const minutes = Math.floor(seconds / 60);
@@ -186,12 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
             nameSpan.textContent = participant.username;
             li.appendChild(nameSpan);
             
-            // Add driver badge if applicable
-            if (participant.isDriver) {
-                const driverBadge = document.createElement('span');
-                driverBadge.className = 'driver-indicator';
-                driverBadge.textContent = 'DRIVER';
-                li.appendChild(driverBadge);
+            // Add role badge if applicable
+            if (participant.role) {
+                const roleBadge = document.createElement('span');
+                roleBadge.className = `participant-role role-${participant.role}`;
+                roleBadge.textContent = participant.role;
+                li.appendChild(roleBadge);
             }
             
             // Add drag handle
@@ -300,6 +328,35 @@ document.addEventListener('DOMContentLoaded', () => {
         // Remove all drag-related classes
         document.querySelectorAll('.participant-item').forEach(item => {
             item.classList.remove('over', 'potential-drop-target');
+        });
+    }
+
+    function updateRolesList(roles) {
+        rolesList.innerHTML = '';
+        
+        roles.forEach((role, index) => {
+            const roleTag = document.createElement('div');
+            roleTag.className = 'role-tag';
+            
+            const roleName = document.createElement('span');
+            roleName.className = 'role-name';
+            roleName.textContent = role;
+            roleTag.appendChild(roleName);
+            
+            // Don't allow removing the Driver role (first role)
+            if (index > 0) {
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-role-btn';
+                removeBtn.innerHTML = '×';
+                removeBtn.title = 'Remove role';
+                removeBtn.addEventListener('click', () => {
+                    const updatedRoles = sessionData.roles.filter(r => r !== role);
+                    socket.emit('updateRoles', updatedRoles);
+                });
+                roleTag.appendChild(removeBtn);
+            }
+            
+            rolesList.appendChild(roleTag);
         });
     }
 }); 

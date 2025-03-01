@@ -314,4 +314,89 @@ input[type="number"]:focus {
     font-weight: normal;
     color: #888;
     font-style: italic;
+}
+
+/* Add these styles for the roles section */
+.roles-section {
+    padding: 20px;
+    background-color: #252525;
+    border-radius: 12px;
+    border: 1px solid #333;
+    margin-bottom: 24px;
+}
+
+.roles-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+#roles-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.role-tag {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 20px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.role-name {
+    font-weight: 500;
+}
+
+.remove-role-btn {
+    background: none;
+    border: none;
+    color: #cf6679;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}
+
+.remove-role-btn:hover {
+    background-color: rgba(207, 102, 121, 0.2);
+}
+
+.roles-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.roles-actions input {
+    flex-grow: 1;
+}
+
+/* Update participant item styles to show roles */
+.participant-role {
+    background-color: #2d2d2d;
+    color: #bb86fc;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-left: 10px;
+    border: 1px solid #444;
+}
+
+/* Style for different roles */
+.role-Driver {
+    color: #03dac6;
+    border-color: #03dac6;
+}
+
+.role-Navigator {
+    color: #bb86fc;
+    border-color: #bb86fc;
 } 

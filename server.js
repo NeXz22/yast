@@ -14,6 +14,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store active sessions
 const sessions = new Map();
 
+// Add this near the top of your file where you define sessions
+const DEFAULT_ROLES = ['Driver', 'Navigator'];
+
 // Socket.io connection handler
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
@@ -30,7 +33,7 @@ io.on('connection', (socket) => {
       session.participants.push({
         id: socket.id,
         username,
-        isDriver: session.participants.length === 0 // First participant becomes driver
+        role: null // New participants don't have a role initially
       });
     } else {
       // Create new session
@@ -40,14 +43,29 @@ io.on('connection', (socket) => {
         participants: [{
           id: socket.id,
           username,
-          isDriver: true // First participant becomes driver
+          role: session?.roles?.[0] || DEFAULT_ROLES[0] // Assign first role to first participant
         }],
+        roles: session?.roles || [...DEFAULT_ROLES], // Copy default roles or use existing ones
         timerDuration: 10 * 60, // 10 minutes in seconds
         timeRemaining: 10 * 60,
         isRunning: false
       };
       sessions.set(newSessionId, session);
       sessionId = newSessionId;
+    }
+    
+    // Assign roles if needed (first participant gets first role, etc.)
+    if (session.participants.length <= session.roles.length) {
+      const unassignedParticipants = session.participants.filter(p => p.role === null);
+      unassignedParticipants.forEach((participant, index) => {
+        // Find the first unassigned role
+        const availableRoles = session.roles.filter(role => 
+          !session.participants.some(p => p.role === role && p.id !== participant.id)
+        );
+        if (availableRoles.length > 0) {
+          participant.role = availableRoles[0];
+        }
+      });
     }
     
     // Join the socket room for this session
@@ -60,6 +78,7 @@ io.on('connection', (socket) => {
     socket.emit('sessionJoined', {
       sessionId,
       participants: session.participants,
+      roles: session.roles,
       timerDuration: session.timerDuration,
       timeRemaining: session.timeRemaining,
       isRunning: session.isRunning
@@ -189,14 +208,18 @@ io.on('connection', (socket) => {
     // Insert at the target position
     session.participants.splice(targetIndex, 0, participant);
     
-    // Ensure the first participant is always the driver
+    // Reassign roles based on order
     session.participants.forEach((p, index) => {
-        p.isDriver = index === 0;
+      if (index < session.roles.length) {
+        p.role = session.roles[index];
+      } else {
+        p.role = null;
+      }
     });
     
     // Notify all participants about the reordering
     io.to(sessionId).emit('participantsReordered', {
-        participants: session.participants
+      participants: session.participants
     });
   });
   
@@ -234,23 +257,55 @@ io.on('connection', (socket) => {
       }
     }
   });
+
+  // Add a new handler for updating roles
+  socket.on('updateRoles', (roles) => {
+    const sessionId = socket.sessionId;
+    if (!sessionId || !sessions.has(sessionId)) return;
+    
+    const session = sessions.get(sessionId);
+    
+    // Update the roles
+    session.roles = roles;
+    
+    // Reassign roles to participants if needed
+    session.participants.forEach((participant, index) => {
+      if (index < roles.length) {
+        participant.role = roles[index];
+      } else {
+        participant.role = null; // No role available
+      }
+    });
+    
+    // Notify all participants
+    io.to(sessionId).emit('rolesUpdated', {
+      roles: session.roles,
+      participants: session.participants
+    });
+  });
 });
 
 // Helper function to rotate the driver role
 function rotateDriver(session) {
   if (session.participants.length <= 1) return;
   
-  // Find current driver index
-  const currentDriverIndex = session.participants.findIndex(p => p.isDriver);
+  // Rotate all participants' roles
+  const firstRole = session.roles[0];
+  const participantsWithRoles = session.participants.filter(p => p.role !== null);
   
-  // Set current driver to false
-  if (currentDriverIndex !== -1) {
-    session.participants[currentDriverIndex].isDriver = false;
+  // Shift roles to the next participant
+  for (let i = 0; i < participantsWithRoles.length; i++) {
+    const currentIndex = i;
+    const nextIndex = (i + 1) % participantsWithRoles.length;
+    
+    // If we've gone full circle, the last person gets the first role
+    if (nextIndex === 0 && currentIndex === participantsWithRoles.length - 1) {
+      participantsWithRoles[currentIndex].role = firstRole;
+    } else {
+      participantsWithRoles[currentIndex].role = 
+        participantsWithRoles[nextIndex].role || session.roles[nextIndex % session.roles.length];
+    }
   }
-  
-  // Set next driver
-  const nextDriverIndex = (currentDriverIndex + 1) % session.participants.length;
-  session.participants[nextDriverIndex].isDriver = true;
 }
 
 // Start the server
