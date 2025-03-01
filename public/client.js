@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rolesList = document.getElementById('roles-list');
     const newRoleInput = document.getElementById('new-role-input');
     const addRoleBtn = document.getElementById('add-role-btn');
+    const changeUsernameBtn = document.getElementById('change-username-btn');
     
     // Connect to Socket.io server with error handling
     let socket;
@@ -258,6 +259,11 @@ document.addEventListener('DOMContentLoaded', () => {
         newRoleInput.value = '';
     });
     
+    // Add event listener for changing username
+    changeUsernameBtn.addEventListener('click', () => {
+        showChangeUsernameModal();
+    });
+    
     // Socket event handlers
     socket.on('sessionJoined', (data) => {
         sessionData = data;
@@ -341,6 +347,18 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionData.participants = data.participants;
         updateRolesList(data.roles);
         updateParticipantsList(data.participants);
+    });
+    
+    // Add socket event handler for username changes
+    socket.on('usernameChanged', (data) => {
+        // Update session data
+        sessionData.participants = data.participants;
+        
+        // Update participants list
+        updateParticipantsList(data.participants);
+        
+        // Show notification
+        showUsernameChangeNotification(data.oldUsername, data.newUsername, data.participantId === socket.id);
     });
     
     // Helper functions
@@ -536,4 +554,104 @@ document.addEventListener('DOMContentLoaded', () => {
             joinForm.classList.remove('hidden');
         }
     });
+
+    // Function to show username change modal
+    function showChangeUsernameModal() {
+        // Create modal elements
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'modal-overlay';
+        
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        
+        const modalTitle = document.createElement('h2');
+        modalTitle.textContent = 'Change Your Name';
+        
+        const modalForm = document.createElement('form');
+        modalForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newUsername = modalUsernameInput.value.trim();
+            if (newUsername) {
+                // Update username
+                changeUsername(newUsername);
+                document.body.removeChild(modalOverlay);
+            }
+        });
+        
+        const modalUsernameInput = document.createElement('input');
+        modalUsernameInput.type = 'text';
+        modalUsernameInput.placeholder = 'New name';
+        modalUsernameInput.required = true;
+        
+        // Find current user's username
+        const currentUser = sessionData.participants.find(p => p.id === socket.id);
+        if (currentUser) {
+            modalUsernameInput.value = currentUser.username;
+        }
+        
+        const modalSubmitBtn = document.createElement('button');
+        modalSubmitBtn.type = 'submit';
+        modalSubmitBtn.className = 'btn primary';
+        modalSubmitBtn.textContent = 'Update Name';
+        
+        // Add cancel button
+        const modalCancelBtn = document.createElement('button');
+        modalCancelBtn.type = 'button';
+        modalCancelBtn.className = 'btn secondary';
+        modalCancelBtn.textContent = 'Cancel';
+        modalCancelBtn.style.marginTop = '10px';
+        modalCancelBtn.addEventListener('click', () => {
+            document.body.removeChild(modalOverlay);
+        });
+        
+        // Assemble modal
+        modalForm.appendChild(modalUsernameInput);
+        modalForm.appendChild(modalSubmitBtn);
+        modalForm.appendChild(modalCancelBtn);
+        modalContent.appendChild(modalTitle);
+        modalContent.appendChild(modalForm);
+        modalOverlay.appendChild(modalContent);
+        
+        // Add to document
+        document.body.appendChild(modalOverlay);
+        
+        // Focus the input and select all text
+        modalUsernameInput.focus();
+        modalUsernameInput.select();
+    }
+
+    // Function to change username
+    function changeUsername(newUsername) {
+        // Find current user
+        const currentUser = sessionData.participants.find(p => p.id === socket.id);
+        if (!currentUser || currentUser.username === newUsername) return;
+        
+        // Update username in local storage
+        storeUsername(sessionData.sessionId, newUsername);
+        
+        // Send to server
+        socket.emit('changeUsername', newUsername);
+    }
+
+    // Function to show username change notification
+    function showUsernameChangeNotification(oldUsername, newUsername, isSelf) {
+        const notificationContainer = document.createElement('div');
+        notificationContainer.className = 'username-change-notification';
+        
+        const message = isSelf 
+            ? `You changed your name from <strong>${oldUsername}</strong> to <strong>${newUsername}</strong>`
+            : `<strong>${oldUsername}</strong> changed their name to <strong>${newUsername}</strong>`;
+        
+        notificationContainer.innerHTML = message;
+        
+        // Add to the session info section
+        sessionInfo.insertBefore(notificationContainer, sessionInfo.firstChild);
+        
+        // Remove after animation completes
+        setTimeout(() => {
+            if (notificationContainer.parentNode) {
+                notificationContainer.parentNode.removeChild(notificationContainer);
+            }
+        }, 5000);
+    }
 }); 

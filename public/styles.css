@@ -443,4 +443,31 @@ input[type="number"]:focus {
 
 .modal-content button {
     width: 100%;
+}
+
+/* Add these styles for the username change button */
+#change-username-btn {
+    margin-left: 10px;
+}
+
+/* Style for username change notification */
+.username-change-notification {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 10px 0;
+    font-size: 14px;
+    border-left: 3px solid #bb86fc;
+    animation: fadeOut 5s forwards;
+}
+
+.username-change-notification strong {
+    color: #bb86fc;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
 } 

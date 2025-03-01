@@ -288,6 +288,30 @@ io.on('connection', (socket) => {
       participants: session.participants
     });
   });
+
+  // Add this event handler to your socket.io connection handler in server.js
+  socket.on('changeUsername', (newUsername) => {
+    const sessionId = socket.sessionId;
+    if (!sessionId || !sessions.has(sessionId)) return;
+    
+    const session = sessions.get(sessionId);
+    
+    // Find the participant
+    const participant = session.participants.find(p => p.id === socket.id);
+    if (!participant) return;
+    
+    // Update the username
+    const oldUsername = participant.username;
+    participant.username = newUsername;
+    
+    // Notify all participants
+    io.to(sessionId).emit('usernameChanged', {
+      participantId: socket.id,
+      oldUsername,
+      newUsername,
+      participants: session.participants
+    });
+  });
 });
 
 // Helper function to rotate the driver role
