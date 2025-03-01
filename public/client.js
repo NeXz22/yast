@@ -222,6 +222,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Timer controls
     startBtn.addEventListener('click', () => {
+        // Set running state immediately to update UI
+        sessionData.isRunning = true;
+        
+        // Update button states
+        updateButtonStates(true);
+        
+        // Update the document title right away
+        updateDocumentTitle(sessionData.timeRemaining);
+        
+        // Emit the start timer event
         socket.emit('startTimer');
     });
     
@@ -269,9 +279,16 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionData = data;
         currentSessionIdSpan.textContent = data.sessionId;
         timerDurationInput.value = Math.floor(data.timerDuration / 60);
+        
+        // Update timer display
         updateTimerDisplay(data.timeRemaining);
+        
+        // Update participants and roles lists
         updateParticipantsList(data.participants);
         updateRolesList(data.roles);
+        
+        // Set button states based on timer status
+        updateButtonStates(data.isRunning);
         
         // Update URL with the session ID from the server
         const newUrl = `/sessionid/${data.sessionId}`;
@@ -295,20 +312,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     socket.on('timerStarted', (data) => {
-        sessionData.isRunning = data.isRunning;
-        updateTimerControls();
+        sessionData.isRunning = true;
+        updateButtonStates(true);
+
+        // Make sure we have a valid timeRemaining value
+        if (typeof data.timeRemaining === 'number' && !isNaN(data.timeRemaining)) {
+            sessionData.timeRemaining = data.timeRemaining;
+            // Update button states
+
+            // Update timer display and document title
+            updateTimerDisplay(data.timeRemaining);
+            
+            // Force document title update to ensure "(paused)" is removed
+            updateDocumentTitle(data.timeRemaining);
+        } else {
+            // Fallback to the last known valid time
+            updateTimerDisplay(sessionData.timeRemaining);
+        }
     });
     
     socket.on('timerPaused', (data) => {
-        sessionData.isRunning = data.isRunning;
+        sessionData.isRunning = false;
         sessionData.timeRemaining = data.timeRemaining;
+        
+        // Update button states
+        updateButtonStates(false);
+        
         updateTimerDisplay(data.timeRemaining);
-        updateTimerControls();
+        
+        // Explicitly update the document title to reflect paused state
+        updateDocumentTitle(data.timeRemaining);
     });
     
     socket.on('timerReset', (data) => {
         sessionData.timeRemaining = data.timeRemaining;
+        
         updateTimerDisplay(data.timeRemaining);
+        
+        // Explicitly update the document title to reflect reset state
+        updateDocumentTitle(data.timeRemaining);
     });
     
     socket.on('timerUpdate', (data) => {
@@ -339,6 +381,8 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('participantsReordered', (data) => {
         sessionData.participants = data.participants;
         updateParticipantsList(data.participants);
+        // Update title to show new driver
+        updateDocumentTitle(data.timeRemaining);
     });
     
     // Add handler for roles updated
@@ -363,6 +407,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Helper functions
     function updateTimerDisplay(seconds) {
+        // Ensure seconds is a valid number
+        if (typeof seconds !== 'number' || isNaN(seconds)) {
+            console.error('Invalid seconds value for timer display:', seconds);
+            seconds = sessionData.timeRemaining || 0; // Fallback to stored value or 0
+        }
+        
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -373,6 +423,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             timerDisplay.classList.remove('ending');
         }
+        
+        // Update the document title
+        updateDocumentTitle(seconds);
     }
     
     function updateParticipantsList(participants) {
@@ -653,5 +706,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 notificationContainer.parentNode.removeChild(notificationContainer);
             }
         }, 5000);
+    }
+
+    // Add this function to update the document title with the timer
+    function updateDocumentTitle(seconds) {
+        // Ensure seconds is a valid number
+        if (typeof seconds !== 'number' || isNaN(seconds)) {
+            seconds = sessionData.timeRemaining || 0; // Fallback to stored value or 0
+        }
+        
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        const timeString = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        
+        // Get the current driver's name
+        let driverName = '';
+        const driverParticipant = sessionData.participants.find(p => p.role === sessionData.roles[0]);
+        if (driverParticipant) {
+            driverName = driverParticipant.username;
+        }
+        
+        // Set the document title with the time and driver info
+        if (sessionData.isRunning) {
+            document.title = `${timeString} - ${driverName} driving - Mob Timer`;
+        } else {
+            document.title = `${timeString} (paused) - Mob Timer`;
+        }
+    }
+
+    // Create a dedicated function to update button states
+    function updateButtonStates(isRunning) {
+        if (isRunning) {
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+        } else {
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+        }
     }
 }); 
