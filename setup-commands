@@ -1,0 +1,5 @@
+mkdir mob-timer
+cd mob-timer
+npm init -y
+npm install express socket.io uuid
+npm install --save-dev nodemon 
