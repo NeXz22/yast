@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build": "npm run clean && npm run copy-static",
+    "clean": "rm -rf dist && mkdir -p dist/public",
+    "copy-static": "cp -r public/* dist/public/ && cp server.js dist/ && cp package.json dist/"
   },
   "keywords": [
     "mob-programming",
@@ -22,5 +25,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 } 
