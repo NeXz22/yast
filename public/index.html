@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mob Programming Timer</title>
     <link rel="stylesheet" href="/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
@@ -31,8 +34,11 @@
             </div>
             
             <div class="timer-section">
-                <div class="timer-display">
-                    <span id="timer">10:00</span>
+                <div class="timer-display-container">
+                    <div class="timer-ring"></div>
+                    <div class="timer-display">
+                        <span id="timer">10:00</span>
+                    </div>
                 </div>
                 <div class="timer-controls">
                     <button id="start-btn" class="btn primary">Start</button>

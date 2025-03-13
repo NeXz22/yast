@@ -412,13 +412,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
-        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        const display = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        document.getElementById('timer').textContent = display;
         
-        // Add visual indication when timer is about to end
-        if (seconds <= 30 && sessionData.isRunning) {
-            timerDisplay.classList.add('ending');
+        // Add this line to update the ring
+        updateTimerRing(seconds, sessionData.timerDuration);
+        
+        // If you have code that changes the timer color when it's ending, keep it
+        if (seconds <= 10) {
+            document.getElementById('timer').parentElement.classList.add('ending');
         } else {
-            timerDisplay.classList.remove('ending');
+            document.getElementById('timer').parentElement.classList.remove('ending');
         }
         
         // Update the document title
@@ -740,5 +744,11 @@ document.addEventListener('DOMContentLoaded', () => {
             startBtn.disabled = false;
             pauseBtn.disabled = true;
         }
+    }
+
+    // Add this function to update the timer ring progress
+    function updateTimerRing(timeLeft, totalTime) {
+        const progressPercentage = (timeLeft / totalTime) * 100;
+        document.querySelector('.timer-ring').style.setProperty('--progress', `${progressPercentage}%`);
     }
 }); 
