@@ -6,7 +6,19 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+
+// Configure Socket.IO with CORS for Vercel
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["my-custom-header"],
+    credentials: true
+  },
+  // Add these options for better compatibility with serverless environments
+  transports: ['websocket', 'polling'],
+  path: '/socket.io'
+});
 
 // Serve static files first
 app.use(express.static(path.join(__dirname, 'public')));
@@ -337,8 +349,14 @@ function rotateDriver(session) {
   }
 }
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-}); 
+// For Vercel, we need to check if we're being imported as a module
+if (require.main === module) {
+  // Start the server
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export for serverless use
+module.exports = app; 
